@@ -25,33 +25,37 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Prepare source archive
+      - name: Extract and validate source Android project
         shell: bash
         run: |
           set -euo pipefail
-          test -f BibleJW-Otetela-main-1.zip
-          mkdir -p app/src/main/assets
-          cp BibleJW-Otetela-main-1.zip app/src/main/assets/bible_source.zip
-          unzip -t BibleJW-Otetela-main-1.zip >/tmp/zip-test.txt
-          grep -qi '\.epub$' /tmp/zip-test.txt || {
-            echo "ERROR: aucune ressource EPUB détectée dans l'archive source."
-            cat /tmp/zip-test.txt
-            exit 1
-          }
+          test -s BibleJW-Otetela-main-1.zip
+          rm -rf source_project
+          mkdir -p source_project
+          unzip -q BibleJW-Otetela-main-1.zip -d source_project
+          PROJECT="source_project/BibleJW-Otetela-main"
+          test -f "$PROJECT/settings.gradle"
+          test -f "$PROJECT/build.gradle"
+          test -f "$PROJECT/app/build.gradle"
+          test -f "$PROJECT/app/src/main/AndroidManifest.xml"
+          test -f "$PROJECT/app/src/main/java/com/biblejw/app/MainActivity.java"
+          test -f "$PROJECT/app/src/main/assets/index.html"
+          python3 "$PROJECT/tools_validate.py" || true
 
       - name: Generate Gradle wrapper
-        shell: bash
-        run: |
-          set -euo pipefail
-          gradle wrapper --gradle-version 8.10.2 --distribution-type bin
+        working-directory: source_project/BibleJW-Otetela-main
+        run: gradle wrapper --gradle-version 8.10.2 --distribution-type bin
 
       - name: Run unit tests
+        working-directory: source_project/BibleJW-Otetela-main
         run: ./gradlew test --no-daemon
 
       - name: Build debug APK
+        working-directory: source_project/BibleJW-Otetela-main
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Verify APK
+        working-directory: source_project/BibleJW-Otetela-main
         shell: bash
         run: |
           set -euo pipefail
@@ -64,6 +68,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Bible-Otetela-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: source_project/BibleJW-Otetela-main/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
