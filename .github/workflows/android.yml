@@ -1,0 +1,69 @@
+name: Android APK - Bible Otetela
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f BibleJW-Otetela-main-1.zip
+          mkdir -p app/src/main/assets
+          cp BibleJW-Otetela-main-1.zip app/src/main/assets/bible_source.zip
+          unzip -t BibleJW-Otetela-main-1.zip >/tmp/zip-test.txt
+          grep -qi '\.epub$' /tmp/zip-test.txt || {
+            echo "ERROR: aucune ressource EPUB détectée dans l'archive source."
+            cat /tmp/zip-test.txt
+            exit 1
+          }
+
+      - name: Generate Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle wrapper --gradle-version 8.10.2 --distribution-type bin
+
+      - name: Run unit tests
+        run: ./gradlew test --no-daemon
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          file "$APK"
+          sha256sum "$APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bible-Otetela-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
