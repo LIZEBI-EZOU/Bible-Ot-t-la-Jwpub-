@@ -58,13 +58,10 @@ jobs:
           echo "=== repair only invalid/missing Android packaging resources ==="
           DRAW="$PROJECT/app/src/main/res/drawable"
           mkdir -p "$DRAW"
-          if ! file "$DRAW/ic_launcher.png" | grep -qi 'PNG image data'; then
-            convert "$PROJECT/app/src/main/assets/cover_small.jpg" "$DRAW/ic_launcher.png"
-          fi
-          if [ ! -s "$DRAW/ic_launcher_cover.png" ]; then
-            convert "$PROJECT/app/src/main/assets/cover_small.jpg" "$DRAW/ic_launcher_cover.png"
-          fi
-          file "$DRAW/ic_launcher.png" "$DRAW/ic_launcher_cover.png"
+          rm -f "$DRAW/ic_launcher.png" "$DRAW/ic_launcher_cover.png"
+          base64 -d "$PROJECT/app/src/main/assets/ic_launcher.jpg.b64" > "$DRAW/ic_launcher.jpg"
+          cp "$DRAW/ic_launcher.jpg" "$DRAW/ic_launcher_cover.jpg"
+          file "$DRAW/ic_launcher.jpg" "$DRAW/ic_launcher_cover.jpg"
 
           python3 "$PROJECT/tools_validate.py"
 
