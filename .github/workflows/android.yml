@@ -25,7 +25,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Extract and validate source Android project
+      - name: Extract and prepare bundled Android project
         shell: bash
         run: |
           set -euo pipefail
@@ -40,7 +40,33 @@ jobs:
           test -f "$PROJECT/app/src/main/AndroidManifest.xml"
           test -f "$PROJECT/app/src/main/java/com/biblejw/app/MainActivity.java"
           test -f "$PROJECT/app/src/main/assets/index.html"
-          python3 "$PROJECT/tools_validate.py" || true
+
+          echo "=== prepare_otetela.py interface ==="
+          grep -nE 'ArgumentParser|add_argument|__main__' "$PROJECT/prepare_otetela.py" || true
+          python3 "$PROJECT/prepare_otetela.py" --help || true
+
+          echo "=== project assets ==="
+          find "$PROJECT/app/src/main/assets" -maxdepth 1 -type f -printf '%f\n' | sort
+
+          echo "=== generate derived index when the source project provides the generator ==="
+          if [ -f "$PROJECT/prepare_otetela.py" ]; then
+            python3 "$PROJECT/prepare_otetela.py"
+          fi
+
+          test -s "$PROJECT/app/src/main/assets/bible_index.json"
+
+          echo "=== repair only invalid/missing Android packaging resources ==="
+          DRAW="$PROJECT/app/src/main/res/drawable"
+          mkdir -p "$DRAW"
+          if ! file "$DRAW/ic_launcher.png" | grep -qi 'PNG image data'; then
+            convert "$PROJECT/app/src/main/assets/cover_small.jpg" "$DRAW/ic_launcher.png"
+          fi
+          if [ ! -s "$DRAW/ic_launcher_cover.png" ]; then
+            convert "$PROJECT/app/src/main/assets/cover_small.jpg" "$DRAW/ic_launcher_cover.png"
+          fi
+          file "$DRAW/ic_launcher.png" "$DRAW/ic_launcher_cover.png"
+
+          python3 "$PROJECT/tools_validate.py"
 
       - name: Generate Gradle wrapper
         working-directory: source_project/BibleJW-Otetela-main
